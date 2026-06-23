@@ -88,7 +88,7 @@ export function EventModal({ isOpen, onClose, onSave, initialData }: EventModalP
               <option value="deadline">Deadline</option>
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4">
             <div className="space-y-2">
               <Label>Start</Label>
               <Input type="datetime-local" {...form.register("start_datetime")} />
