@@ -88,7 +88,7 @@ export default function SettingsPage() {
               <p className="text-sm font-semibold">How to connect your Telegram account:</p>
               <ol className="text-sm text-muted-foreground space-y-3 list-decimal list-inside">
                 <li>
-                  Open Telegram on your phone or computer and search for <strong>TimePilot AI</strong> (or your specific bot name).
+                  Open Telegram on your phone or computer and search for <strong>TimePilot AI</strong> (t.me/timepilot_ai_bot).
                 </li>
                 <li>
                   Type <code className="bg-muted px-1.5 py-0.5 rounded text-foreground font-mono text-xs">/start</code> and hit send.
