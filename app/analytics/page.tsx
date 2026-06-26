@@ -19,11 +19,18 @@ export default function AnalyticsPage() {
     }).catch(console.error);
   }, []);
 
-  const renderData = (data: any) => {
+  const renderData = (data: any, periodLabel: string) => {
     if (!data) return null;
 
     return (
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <div className="col-span-full mb-2">
+          <h2 className="text-xl font-semibold border-b pb-2">Showing data for: <span className="text-primary">{periodLabel}</span></h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Note: If you just created your account today, your Daily, Weekly, and Monthly stats will look identical until more days pass.
+          </p>
+        </div>
+
         {/* Productivity */}
         <Card className="col-span-full md:col-span-2 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
           <CardHeader className="pb-2">
@@ -121,10 +128,10 @@ export default function AnalyticsPage() {
           <TabsTrigger value="monthly">This Month</TabsTrigger>
           <TabsTrigger value="yearly">This Year</TabsTrigger>
         </TabsList>
-        <TabsContent value="daily" className="mt-2">{renderData(analytics.daily)}</TabsContent>
-        <TabsContent value="weekly" className="mt-2">{renderData(analytics.weekly)}</TabsContent>
-        <TabsContent value="monthly" className="mt-2">{renderData(analytics.monthly)}</TabsContent>
-        <TabsContent value="yearly" className="mt-2">{renderData(analytics.yearly)}</TabsContent>
+        <TabsContent value="daily" className="mt-2">{renderData(analytics.daily, "Today")}</TabsContent>
+        <TabsContent value="weekly" className="mt-2">{renderData(analytics.weekly, "This Week")}</TabsContent>
+        <TabsContent value="monthly" className="mt-2">{renderData(analytics.monthly, "This Month")}</TabsContent>
+        <TabsContent value="yearly" className="mt-2">{renderData(analytics.yearly, "This Year")}</TabsContent>
       </Tabs>
     </div>
   );

@@ -5,7 +5,7 @@ import { AuthProvider } from "@/lib/auth/context";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "sonner";
 import AppLayout from "@/components/layout/AppLayout";
-import { AIAssistant } from "@/components/ui/AIAssistant";
+
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -39,7 +39,7 @@ export default function RootLayout({
             <AppLayout>
               {children}
             </AppLayout>
-            <AIAssistant />
+
             <Toaster position="top-right" richColors />
           </AuthProvider>
         </ThemeProvider>
