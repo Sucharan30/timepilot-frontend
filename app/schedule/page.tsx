@@ -155,7 +155,10 @@ export default function SchedulePage() {
 
   // Add padding for month view grid
   const startOffset = monthStart.getDay() === 0 ? 6 : monthStart.getDay() - 1;
-  const monthGrid = Array.from({ length: startOffset }).map(() => null).concat(monthDays as any);
+  const monthGrid: (Date | null)[] = [
+    ...Array.from({ length: startOffset }).map(() => null),
+    ...monthDays,
+  ];
 
   const getEventColor = (type: string) => EVENT_COLORS[type?.toLowerCase()] || EVENT_COLORS.default;
 
