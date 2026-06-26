@@ -4,16 +4,32 @@ import { apiClient } from "@/lib/api/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
+import { useAuth } from "@/lib/auth/context";
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<any>({});
+  const [profileName, setProfileName] = useState("");
   const { theme, setTheme } = useTheme();
+  const { user, refreshUser } = useAuth();
   
   useEffect(() => { 
     apiClient.get("/settings/notifications").then(res => setSettings(res.data)).catch(console.error);
-  }, []);
+    if (user) {
+      setProfileName(user.full_name || "");
+    }
+  }, [user]);
+
+  const saveProfile = async () => {
+    try {
+      await apiClient.put("/auth/me", { full_name: profileName });
+      await refreshUser();
+      toast.success("Profile updated");
+    } catch(err) { toast.error("Failed to update profile"); }
+  }
 
   const saveSettings = async () => {
     try {
@@ -26,9 +42,30 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-4 md:p-8 space-y-6 max-w-4xl">
+    <div className="p-4 md:p-8 space-y-6 max-w-4xl mx-auto">
       <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
       
+      <Card>
+        <CardHeader>
+          <CardTitle>Profile</CardTitle>
+          <CardDescription>Update your personal information</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Full Name</Label>
+            <div className="flex gap-2">
+              <Input 
+                value={profileName} 
+                onChange={(e) => setProfileName(e.target.value)}
+                placeholder="Enter your name"
+                className="max-w-xs"
+              />
+              <Button onClick={saveProfile}>Save Name</Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Notifications</CardTitle>
