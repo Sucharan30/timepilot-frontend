@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/context";
 import { useTheme } from "next-themes";
 import { apiClient } from "@/lib/api/client";
+import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,8 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 export default function TopNav({ isSidebarOpen, setIsSidebarOpen }: { isSidebarOpen: boolean; setIsSidebarOpen: (val: boolean) => void }) {
   const { user, logout } = useAuth();
@@ -27,7 +27,56 @@ export default function TopNav({ isSidebarOpen, setIsSidebarOpen }: { isSidebarO
   const [searchResults, setSearchResults] = useState<any>({ events: [], tasks: [], expenses: [] });
 
   // Notifications State
-  const [notifications, setNotifications] = useState([{ id: 1, text: "Welcome to TimePilot AI", read: false }]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+
+  // Connect to SSE
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const eventSource = new EventSource(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/events/stream?token=${token}`);
+
+    eventSource.addEventListener("update", (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        
+        // Add to notifications dropdown
+        const newNotif = {
+          id: Date.now(),
+          text: `Update: ${data.type.replace(/_/g, ' ')}`,
+          data: data,
+          read: false,
+          timestamp: new Date()
+        };
+
+        if (data.type === "notification_sent") {
+            newNotif.text = data.message || "New Reminder";
+        } else if (data.type === "event_created") {
+            newNotif.text = `New event created: ${data.title}`;
+        } else if (data.type === "streak_updated") {
+            newNotif.text = `Streak updated! Now at ${data.current_streak} days.`;
+        }
+
+        setNotifications(prev => [newNotif, ...prev].slice(0, 20)); // Keep last 20
+        
+        // Show toast
+        toast.info(newNotif.text, {
+          icon: <Bell className="h-4 w-4" />
+        });
+      } catch (err) {
+        console.error("SSE parse error", err);
+      }
+    });
+
+    eventSource.onerror = (error) => {
+      console.error("SSE error", error);
+      eventSource.close();
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  }, []);
 
   // CMD+K shortcut
   useEffect(() => {
@@ -100,19 +149,30 @@ export default function TopNav({ isSidebarOpen, setIsSidebarOpen }: { isSidebarO
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <div className="max-h-[300px] overflow-y-auto">
-                {notifications.map(n => (
-                  <DropdownMenuItem key={n.id} className="flex justify-between items-start p-3 cursor-default">
-                    <div className="flex gap-2 items-start">
-                      {!n.read && <div className="mt-1.5 h-2 w-2 rounded-full bg-primary shrink-0" />}
-                      <span className={`text-sm ${n.read ? 'text-muted-foreground' : 'font-medium'}`}>{n.text}</span>
-                    </div>
-                  </DropdownMenuItem>
-                ))}
+                {notifications.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-muted-foreground">No new notifications</div>
+                ) : (
+                  notifications.map(n => (
+                    <DropdownMenuItem key={n.id} className="flex justify-between items-start p-3 cursor-default border-b last:border-0">
+                      <div className="flex gap-2 items-start">
+                        {!n.read && <div className="mt-1.5 h-2 w-2 rounded-full bg-primary shrink-0" />}
+                        <div>
+                          <span className={`text-sm block ${n.read ? 'text-muted-foreground' : 'font-medium'}`}>{n.text}</span>
+                          <span className="text-[10px] text-muted-foreground">{n.timestamp.toLocaleTimeString()}</span>
+                        </div>
+                      </div>
+                    </DropdownMenuItem>
+                  ))
+                )}
               </div>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="justify-center text-primary font-medium cursor-pointer" onClick={() => setNotifications(notifications.map(n => ({...n, read: true})))}>
-                Mark all as read
-              </DropdownMenuItem>
+              {notifications.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="justify-center text-primary font-medium cursor-pointer" onClick={(e) => { e.preventDefault(); setNotifications(notifications.map(n => ({...n, read: true}))); }}>
+                    Mark all as read
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -163,7 +223,7 @@ export default function TopNav({ isSidebarOpen, setIsSidebarOpen }: { isSidebarO
                   <div>
                     <h3 className="text-xs font-semibold text-muted-foreground px-2 mb-2 uppercase tracking-wider">Events</h3>
                     {searchResults.events.map((e: any) => (
-                      <div key={e.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-primary/10 cursor-pointer transition-colors">
+                      <div key={e.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-primary/10 cursor-pointer transition-colors" onClick={() => setSearchOpen(false)}>
                         <span className="font-medium text-sm">{e.title}</span>
                         <span className="text-xs text-muted-foreground capitalize">{e.event_type}</span>
                       </div>
@@ -174,7 +234,7 @@ export default function TopNav({ isSidebarOpen, setIsSidebarOpen }: { isSidebarO
                   <div>
                     <h3 className="text-xs font-semibold text-muted-foreground px-2 mb-2 uppercase tracking-wider">Tasks</h3>
                     {searchResults.tasks.map((e: any) => (
-                      <div key={e.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-primary/10 cursor-pointer transition-colors">
+                      <div key={e.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-primary/10 cursor-pointer transition-colors" onClick={() => setSearchOpen(false)}>
                         <span className="font-medium text-sm">{e.title}</span>
                       </div>
                     ))}
@@ -184,8 +244,8 @@ export default function TopNav({ isSidebarOpen, setIsSidebarOpen }: { isSidebarO
                   <div>
                     <h3 className="text-xs font-semibold text-muted-foreground px-2 mb-2 uppercase tracking-wider">Expenses</h3>
                     {searchResults.expenses.map((e: any) => (
-                      <div key={e.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-primary/10 cursor-pointer transition-colors">
-                        <span className="font-medium text-sm">{e.description}</span>
+                      <div key={e.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-primary/10 cursor-pointer transition-colors" onClick={() => setSearchOpen(false)}>
+                        <span className="font-medium text-sm">{e.description || e.category}</span>
                         <span className="text-xs font-medium text-primary">₹{e.amount}</span>
                       </div>
                     ))}
