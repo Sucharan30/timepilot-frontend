@@ -78,7 +78,7 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <div className="relative min-h-[300px] px-8 pb-8">
+        <div className="relative min-h-[420px] px-8 pb-8">
           <AnimatePresence mode="wait">
             {step === 1 && (
               <motion.div
