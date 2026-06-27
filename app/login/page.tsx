@@ -55,7 +55,7 @@ export default function LoginPage() {
   };
 
   const openTelegram = () => {
-    window.open("https://t.me/timepilot_ai_bot", "_blank");
+    window.open("https://t.me/productivityhelper_bot", "_blank");
     setStep(2);
   };
 
@@ -94,9 +94,9 @@ export default function LoginPage() {
                     <p className="font-medium text-foreground mb-1">Secure Telegram Login</p>
                     <p>TimePilot AI uses Telegram for secure, passwordless authentication.</p>
                   </div>
-                  
-                  <Button 
-                    onClick={openTelegram} 
+
+                  <Button
+                    onClick={openTelegram}
                     className="w-full h-12 text-md flex items-center justify-between group rounded-xl"
                   >
                     <span className="flex items-center">
@@ -143,7 +143,7 @@ export default function LoginPage() {
                       </p>
                     )}
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label htmlFor="otp">6-Digit Code</Label>
                     <Input
@@ -161,11 +161,11 @@ export default function LoginPage() {
                       </p>
                     )}
                   </div>
-                  
+
                   <Button type="submit" className="w-full h-11 rounded-lg mt-2" disabled={isLoading}>
                     {isLoading ? "Verifying..." : "Sign In to Mission Control"}
                   </Button>
-                  
+
                   <button
                     type="button"
                     onClick={() => setStep(1)}

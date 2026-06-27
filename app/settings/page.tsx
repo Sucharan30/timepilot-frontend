@@ -15,8 +15,8 @@ export default function SettingsPage() {
   const [profileName, setProfileName] = useState("");
   const { theme, setTheme } = useTheme();
   const { user, refreshUser } = useAuth();
-  
-  useEffect(() => { 
+
+  useEffect(() => {
     apiClient.get("/settings/notifications").then(res => setSettings(res.data)).catch(console.error);
     if (user) {
       setProfileName(user.full_name || "");
@@ -28,7 +28,7 @@ export default function SettingsPage() {
       await apiClient.put("/auth/me", { full_name: profileName });
       await refreshUser();
       toast.success("Profile updated");
-    } catch(err) { toast.error("Failed to update profile"); }
+    } catch (err) { toast.error("Failed to update profile"); }
   }
 
   const saveSettings = async () => {
@@ -38,13 +38,13 @@ export default function SettingsPage() {
         reminder_minutes: settings.reminder_minutes
       });
       toast.success("Settings saved");
-    } catch(err) { toast.error("Failed to save settings"); }
+    } catch (err) { toast.error("Failed to save settings"); }
   }
 
   return (
     <div className="p-4 md:p-8 space-y-6 max-w-4xl mx-auto">
       <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-      
+
       <Card>
         <CardHeader>
           <CardTitle>Profile</CardTitle>
@@ -54,8 +54,8 @@ export default function SettingsPage() {
           <div className="space-y-2">
             <Label>Full Name</Label>
             <div className="flex gap-2">
-              <Input 
-                value={profileName} 
+              <Input
+                value={profileName}
                 onChange={(e) => setProfileName(e.target.value)}
                 placeholder="Enter your name"
                 className="max-w-xs"
@@ -74,7 +74,7 @@ export default function SettingsPage() {
         <CardContent className="space-y-6">
           <div className="flex items-center justify-between">
             <div><p className="font-medium">Enable Notifications</p><p className="text-sm text-muted-foreground">Receive reminders via Telegram</p></div>
-            <Switch checked={settings.notification_enabled || false} onCheckedChange={(v) => setSettings({...settings, notification_enabled: v})} />
+            <Switch checked={settings.notification_enabled || false} onCheckedChange={(v) => setSettings({ ...settings, notification_enabled: v })} />
           </div>
           <Button onClick={saveSettings}>Save Notification Settings</Button>
         </CardContent>
@@ -92,7 +92,7 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
-      
+
       <Card>
         <CardHeader>
           <CardTitle>Telegram Integration</CardTitle>
@@ -110,7 +110,7 @@ export default function SettingsPage() {
               </p>
               <p className="text-sm text-muted-foreground mt-1">Ready to receive your commands</p>
             </div>
-            <Button onClick={() => window.open("https://t.me/timepilot_ai_bot", "_blank")}>Open Telegram</Button>
+            <Button onClick={() => window.open("https://t.me/productivityhelper_bot", "_blank")}>Open Telegram</Button>
           </div>
 
           <div className="space-y-4">
