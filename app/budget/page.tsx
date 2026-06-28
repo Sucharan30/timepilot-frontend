@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function BudgetPage() {
   const [budgets, setBudgets] = useState<any[]>([]);
+  const [budgetSummary, setBudgetSummary] = useState<any[]>([]);
   const [expenses, setExpenses] = useState<any[]>([]);
   
   // Modals state
@@ -28,12 +29,14 @@ export default function BudgetPage() {
 
   const fetchData = async () => {
     try {
-      const [bRes, eRes] = await Promise.all([
+      const [bRes, eRes, sRes] = await Promise.all([
         apiClient.get("/budget"),
-        apiClient.get("/expenses")
+        apiClient.get("/expenses"),
+        apiClient.get("/budget/summary").catch(() => ({ data: [] })),
       ]);
       setBudgets(bRes.data);
       setExpenses(eRes.data);
+      setBudgetSummary(Array.isArray(sRes.data) ? sRes.data : []);
     } catch (e) {
       toast.error("Failed to load budget data");
     }
@@ -137,17 +140,23 @@ export default function BudgetPage() {
     setIsExpenseOpen(true);
   };
 
-  // Calculations
-  const budgetsWithSpent = budgets.map((b) => {
-    const spent = expenses
-      .filter((e) => e.category.toLowerCase() === b.category.toLowerCase())
-      .reduce((acc, e) => acc + parseFloat(e.amount), 0);
-    return { ...b, current_spent: spent };
-  });
+  // Use server-computed summary if available, fallback to local calculation
+  const budgetsWithSpent = budgetSummary.length > 0
+    ? budgetSummary
+    : budgets.map((b) => {
+        const spent = expenses
+          .filter((e) => e.category.toLowerCase() === b.category.toLowerCase())
+          .reduce((acc, e) => acc + parseFloat(e.amount), 0);
+        const limit = parseFloat(b.monthly_limit);
+        const remaining = Math.max(0, limit - spent);
+        const percentage = limit > 0 ? Math.round(spent / limit * 100) : 0;
+        return { ...b, current_spent: spent, spent, monthly_limit: limit, remaining, percentage };
+      });
 
-  const totalLimit = budgetsWithSpent.reduce((acc, b) => acc + parseFloat(b.monthly_limit), 0);
-  const totalSpent = budgetsWithSpent.reduce((acc, b) => acc + b.current_spent, 0);
+  const totalLimit = budgetsWithSpent.reduce((acc, b) => acc + (b.monthly_limit || 0), 0);
+  const totalSpent = budgetsWithSpent.reduce((acc, b) => acc + (b.spent || b.current_spent || 0), 0);
   const totalProgress = totalLimit > 0 ? (totalSpent / totalLimit) * 100 : 0;
+
 
   return (
     <div className="p-4 md:p-8 space-y-6 max-w-7xl mx-auto">
@@ -198,30 +207,42 @@ export default function BudgetPage() {
               </div>
             ) : (
               budgetsWithSpent.map((b: any) => {
-                const progress = (b.current_spent / b.monthly_limit) * 100;
-                const isOver = progress >= 100;
+                const spent = b.spent ?? b.current_spent ?? 0;
+                const limit = b.monthly_limit ?? 0;
+                const remaining = b.remaining ?? Math.max(0, limit - spent);
+                const progress = b.percentage ?? (limit > 0 ? Math.round(spent / limit * 100) : 0);
+                const isOver    = progress >= 100;
                 const isWarning = progress >= 80 && !isOver;
+                const statusColor = isOver ? "text-destructive" : isWarning ? "text-orange-500" : "text-emerald-500";
                 
                 return (
                   <Card key={b.id} className="group hover:border-primary/50 transition-colors cursor-pointer" onClick={() => openBudgetModal(b)}>
                     <CardHeader className="pb-2">
                       <div className="flex justify-between items-start">
-                        <CardTitle>{b.category}</CardTitle>
+                        <div>
+                          <CardTitle>{b.category}</CardTitle>
+                          <p className={`text-xs font-medium mt-0.5 ${statusColor}`}>
+                            {isOver ? "⚠️ Over budget" : isWarning ? "⚠️ Near limit" : "✅ On track"}
+                          </p>
+                        </div>
                         <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); openBudgetModal(b); }}>
                           <Edit2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-3">
                       <div className="flex justify-between text-sm">
-                        <span className={isOver ? "text-destructive font-bold" : ""}>Spent: ₹{b.current_spent.toLocaleString()}</span>
-                        <span className="text-muted-foreground">Limit: ₹{parseFloat(b.monthly_limit).toLocaleString()}</span>
+                        <span className={isOver ? "text-destructive font-bold" : ""}>₹{spent.toLocaleString(undefined, {maximumFractionDigits: 0})} spent</span>
+                        <span className="text-muted-foreground">₹{Number(limit).toLocaleString(undefined, {maximumFractionDigits: 0})} limit</span>
                       </div>
                       <Progress 
-                        value={progress} 
-                        className={`h-2 ${isOver ? "[&>div]:bg-destructive" : isWarning ? "[&>div]:bg-orange-500" : ""}`} 
+                        value={Math.min(progress, 100)} 
+                        className={`h-2.5 ${isOver ? "[&>div]:bg-destructive" : isWarning ? "[&>div]:bg-orange-500" : ""}`} 
                       />
-                      {isOver && <p className="text-xs text-destructive mt-1">Over budget by ₹{(b.current_spent - b.monthly_limit).toLocaleString()}</p>}
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>{progress}% used</span>
+                        <span className="text-emerald-600 font-medium">₹{Number(remaining).toLocaleString(undefined, {maximumFractionDigits: 0})} remaining</span>
+                      </div>
                     </CardContent>
                   </Card>
                 );

@@ -3,7 +3,7 @@ import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { LayoutDashboard, Calendar, BarChart3, Wallet, Sparkles, Settings, Target, Trophy } from "lucide-react";
+import { LayoutDashboard, Calendar, BarChart3, Wallet, Sparkles, Settings, Target, Trophy, BookOpen, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -12,6 +12,8 @@ const navItems = [
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
   { name: "Budget", href: "/budget", icon: Wallet },
   { name: "Savings Goals", href: "/savings-goals", icon: Target },
+  { name: "Study Planner", href: "/study-planner", icon: BookOpen },
+  { name: "AI Schedule", href: "/ai-schedule", icon: Zap },
   { name: "AI Insights", href: "/recommendations", icon: Sparkles },
   { name: "Achievements", href: "/achievements", icon: Trophy },
   { name: "Settings", href: "/settings", icon: Settings },

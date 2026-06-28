@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 
+import { Progress } from "@/components/ui/progress";
+
 export default function DashboardPage() {
   const { user } = useAuth();
   const { lastEvent } = useSSE();
@@ -17,17 +19,19 @@ export default function DashboardPage() {
 
   const fetchData = async () => {
     try {
-      const [overviewRes, analyticsRes, streaksRes, insightsRes] = await Promise.all([
+      const [overviewRes, analyticsRes, streaksRes, insightsRes, budgetRes] = await Promise.all([
         apiClient.get("/overview").catch(() => ({ data: {} })),
         apiClient.get("/analytics/daily").catch(() => ({ data: {} })),
         apiClient.get("/streaks").catch(() => ({ data: {} })),
-        apiClient.get("/insights/generate").catch(() => ({ data: [] }))
+        apiClient.get("/insights/generate").catch(() => ({ data: [] })),
+        apiClient.get("/budget/summary").catch(() => ({ data: [] }))
       ]);
       setData({
         overview: overviewRes.data,
         analytics: analyticsRes.data,
         streaks: streaksRes.data,
-        insights: insightsRes.data
+        insights: insightsRes.data,
+        budgetSummary: Array.isArray(budgetRes.data) ? budgetRes.data : []
       });
     } catch (err) {
       console.error(err);
@@ -45,9 +49,15 @@ export default function DashboardPage() {
   const tasks = data?.overview?.tasks_due || [];
   const prodScore = data?.analytics?.productivity_score || 0;
   const streak = data?.streaks?.current_streak || 0;
+  const studyMinutes = data?.analytics?.total_study_minutes || 0;
+  const budgetSummary = data?.budgetSummary || [];
+  
+  const totalLimit = budgetSummary.reduce((acc: number, b: any) => acc + (b.monthly_limit || 0), 0);
+  const totalSpent = budgetSummary.reduce((acc: number, b: any) => acc + (b.spent || 0), 0);
+  const budgetProgress = totalLimit > 0 ? Math.min((totalSpent / totalLimit) * 100, 100) : 0;
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-8 animate-fade-in-up">
+    <div className="flex flex-col gap-6 p-4 md:p-8 animate-fade-in-up max-w-7xl mx-auto">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Mission Control</h1>
         <p className="text-muted-foreground mt-1">Welcome back, {user?.full_name || "User"}. Here is your briefing for {format(new Date(), "EEEE, MMMM do")}.</p>
@@ -69,7 +79,7 @@ export default function DashboardPage() {
                 {events.map((e: any) => (
                   <div key={e.id} className="flex items-center justify-between p-4 border rounded-xl">
                     <div><p className="font-medium">{e.title}</p><p className="text-sm text-muted-foreground">{format(new Date(e.start_datetime), "h:mm a")}</p></div>
-                    <Badge>{e.event_type}</Badge>
+                    <Badge variant="outline">{e.event_type}</Badge>
                   </div>
                 ))}
               </div>
@@ -77,14 +87,33 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
         
-        <Card>
-          <CardHeader><CardTitle>AI Daily Briefing</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div className="p-4 bg-primary/10 text-primary rounded-xl text-sm leading-relaxed">
-              Based on your schedule today, you have {events.length} meetings. Try to focus on deep work during your {events.length > 0 ? 'gaps between meetings' : 'open morning'}.
-            </div>
-          </CardContent>
-        </Card>
+        <div className="space-y-6">
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2"><Target className="h-5 w-5 text-teal-500"/> Study Progress</CardTitle></CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Today's Study Time</span>
+                <span className="font-medium">{studyMinutes} min</span>
+              </div>
+              <Progress value={Math.min((studyMinutes / 120) * 100, 100)} className="h-2 [&>div]:bg-teal-500" />
+              <p className="text-xs text-muted-foreground">Goal: 120 min / day</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2"><Wallet className="h-5 w-5 text-primary"/> Budget Overview</CardTitle></CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Monthly Spent</span>
+                <span className="font-medium">₹{totalSpent.toLocaleString(undefined, {maximumFractionDigits: 0})} / ₹{totalLimit.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
+              </div>
+              <Progress value={budgetProgress} className={`h-2 ${budgetProgress >= 100 ? '[&>div]:bg-destructive' : budgetProgress >= 80 ? '[&>div]:bg-orange-500' : ''}`} />
+              <p className="text-xs text-muted-foreground">
+                {budgetProgress >= 100 ? "Over budget limit!" : budgetProgress >= 80 ? "Nearing budget limit." : "On track."}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

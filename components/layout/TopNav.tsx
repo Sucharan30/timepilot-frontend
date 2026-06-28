@@ -1,11 +1,12 @@
 "use client";
-import React, { useState, useEffect } from "react";
-import { Menu, Bell, Search, Sun, Moon } from "lucide-react";
+import React, { useState, useEffect, useCallback } from "react";
+import { Menu, Bell, Search, Sun, Moon, BookOpen, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/context";
 import { useTheme } from "next-themes";
 import { apiClient } from "@/lib/api/client";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,6 +21,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 export default function TopNav({ isSidebarOpen, setIsSidebarOpen }: { isSidebarOpen: boolean; setIsSidebarOpen: (val: boolean) => void }) {
   const { user, logout } = useAuth();
   const { theme, setTheme } = useTheme();
+  const router = useRouter();
   
   // Search State
   const [searchOpen, setSearchOpen] = useState(false);
@@ -29,9 +31,30 @@ export default function TopNav({ isSidebarOpen, setIsSidebarOpen }: { isSidebarO
   // Notifications State
   const [notifications, setNotifications] = useState<any[]>([]);
 
+  // Load persistent notifications from API
+  const loadNotifications = useCallback(async () => {
+    try {
+      const res = await apiClient.get("/notifications");
+      if (Array.isArray(res.data)) {
+        setNotifications(res.data.map((n: any) => ({
+          ...n,
+          text: n.title || n.body || "Notification",
+          timestamp: new Date(n.notification_time || n.created_at),
+          read: n.is_read,
+        })));
+      }
+    } catch {
+      // Silently fail if notifications endpoint unavailable
+    }
+  }, []);
+
+  useEffect(() => {
+    loadNotifications();
+  }, [loadNotifications]);
+
   // Connect to SSE
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem("access_token");
     if (!token) return;
 
     const eventSource = new EventSource(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/events/stream?token=${token}`);
@@ -40,29 +63,35 @@ export default function TopNav({ isSidebarOpen, setIsSidebarOpen }: { isSidebarO
       try {
         const data = JSON.parse(e.data);
         
-        // Add to notifications dropdown
-        const newNotif = {
-          id: Date.now(),
-          text: `Update: ${data.type.replace(/_/g, ' ')}`,
-          data: data,
-          read: false,
-          timestamp: new Date()
-        };
-
+        let text = `Update: ${data.type?.replace(/_/g, ' ')}`;
         if (data.type === "notification_sent") {
-            newNotif.text = data.message || "New Reminder";
+          text = data.message || "New Reminder";
         } else if (data.type === "event_created") {
-            newNotif.text = `New event created: ${data.title}`;
+          text = `New event created: ${data.title}`;
         } else if (data.type === "streak_updated") {
-            newNotif.text = `Streak updated! Now at ${data.current_streak} days.`;
+          text = `Streak updated! Now at ${data.current_streak} days.`;
+        } else if (data.type === "study_plan_created") {
+          text = `Study plan created: ${data.count} sessions added!`;
+        } else if (data.type === "schedule_negotiated") {
+          text = `AI schedule saved: ${data.count} events added!`;
+        } else if (data.type === "budget_updated") {
+          text = "Budget updated from Telegram.";
         }
 
-        setNotifications(prev => [newNotif, ...prev].slice(0, 20)); // Keep last 20
+        const newNotif = {
+          id: Date.now(),
+          text,
+          data,
+          read: false,
+          timestamp: new Date(),
+        };
+
+        setNotifications(prev => [newNotif, ...prev].slice(0, 50));
         
-        // Show toast
-        toast.info(newNotif.text, {
-          icon: <Bell className="h-4 w-4" />
-        });
+        toast.info(text, { icon: <Bell className="h-4 w-4" /> });
+
+        // Reload API notifications to sync
+        loadNotifications();
       } catch (err) {
         console.error("SSE parse error", err);
       }
@@ -76,7 +105,7 @@ export default function TopNav({ isSidebarOpen, setIsSidebarOpen }: { isSidebarO
     return () => {
       eventSource.close();
     };
-  }, []);
+  }, [loadNotifications]);
 
   // CMD+K shortcut
   useEffect(() => {
@@ -105,6 +134,24 @@ export default function TopNav({ isSidebarOpen, setIsSidebarOpen }: { isSidebarO
   }, [searchQuery]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
+
+  const markAllRead = async () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    try {
+      await apiClient.put("/notifications/read-all");
+    } catch {
+      // Silently fail
+    }
+  };
+
+  const handleSearchResultClick = (type: string, item: any) => {
+    setSearchOpen(false);
+    setSearchQuery("");
+    if (type === "event") router.push("/schedule");
+    else if (type === "expense") router.push("/budget");
+    else if (type === "task") router.push("/schedule");
+    else router.push("/dashboard");
+  };
 
   return (
     <>
@@ -168,7 +215,7 @@ export default function TopNav({ isSidebarOpen, setIsSidebarOpen }: { isSidebarO
               {notifications.length > 0 && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem className="justify-center text-primary font-medium cursor-pointer" onClick={(e) => { e.preventDefault(); setNotifications(notifications.map(n => ({...n, read: true}))); }}>
+                  <DropdownMenuItem className="justify-center text-primary font-medium cursor-pointer" onClick={() => { setNotifications(notifications.map(n => ({...n, read: true }))); markAllRead(); }}>
                     Mark all as read
                   </DropdownMenuItem>
                 </>
@@ -223,7 +270,7 @@ export default function TopNav({ isSidebarOpen, setIsSidebarOpen }: { isSidebarO
                   <div>
                     <h3 className="text-xs font-semibold text-muted-foreground px-2 mb-2 uppercase tracking-wider">Events</h3>
                     {searchResults.events.map((e: any) => (
-                      <div key={e.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-primary/10 cursor-pointer transition-colors" onClick={() => setSearchOpen(false)}>
+                      <div key={e.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-primary/10 cursor-pointer transition-colors" onClick={() => handleSearchResultClick("event", e)}>
                         <span className="font-medium text-sm">{e.title}</span>
                         <span className="text-xs text-muted-foreground capitalize">{e.event_type}</span>
                       </div>
@@ -234,7 +281,7 @@ export default function TopNav({ isSidebarOpen, setIsSidebarOpen }: { isSidebarO
                   <div>
                     <h3 className="text-xs font-semibold text-muted-foreground px-2 mb-2 uppercase tracking-wider">Tasks</h3>
                     {searchResults.tasks.map((e: any) => (
-                      <div key={e.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-primary/10 cursor-pointer transition-colors" onClick={() => setSearchOpen(false)}>
+                      <div key={e.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-primary/10 cursor-pointer transition-colors" onClick={() => handleSearchResultClick("task", e)}>
                         <span className="font-medium text-sm">{e.title}</span>
                       </div>
                     ))}
@@ -244,7 +291,7 @@ export default function TopNav({ isSidebarOpen, setIsSidebarOpen }: { isSidebarO
                   <div>
                     <h3 className="text-xs font-semibold text-muted-foreground px-2 mb-2 uppercase tracking-wider">Expenses</h3>
                     {searchResults.expenses.map((e: any) => (
-                      <div key={e.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-primary/10 cursor-pointer transition-colors" onClick={() => setSearchOpen(false)}>
+                      <div key={e.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-primary/10 cursor-pointer transition-colors" onClick={() => handleSearchResultClick("expense", e)}>
                         <span className="font-medium text-sm">{e.description || e.category}</span>
                         <span className="text-xs font-medium text-primary">₹{e.amount}</span>
                       </div>

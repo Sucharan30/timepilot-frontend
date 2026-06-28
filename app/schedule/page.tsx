@@ -19,6 +19,8 @@ const EVENT_COLORS: Record<string, string> = {
   task: "bg-green-500/20 text-green-400 border-green-500/30",
   reminder: "bg-orange-500/20 text-orange-400 border-orange-500/30",
   class: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+  study: "bg-teal-500/20 text-teal-400 border-teal-500/30",
+  deadline: "bg-red-500/20 text-red-400 border-red-500/30",
   default: "bg-primary/20 text-primary border-primary/30",
 };
 
@@ -32,12 +34,16 @@ export default function SchedulePage() {
   const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
   
   // Form state
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<any>({
     title: "",
     description: "",
     event_type: "meeting",
     start_datetime: "",
     end_datetime: "",
+    is_recurring: false,
+    recurrence_type: "none",
+    recurrence_interval: 1,
+    recurrence_end_date: "",
   });
 
   const fetchEvents = async () => {
@@ -65,10 +71,16 @@ export default function SchedulePage() {
   const handleSaveEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const payload = {
-        ...formData,
+      const payload: any = {
+        title: formData.title,
+        description: formData.description,
+        event_type: formData.event_type,
         start_datetime: parseLocalString(formData.start_datetime)!,
         end_datetime: formData.end_datetime ? parseLocalString(formData.end_datetime) : null,
+        is_recurring: formData.is_recurring,
+        recurrence_type: formData.is_recurring ? formData.recurrence_type : "none",
+        recurrence_interval: formData.is_recurring ? Number(formData.recurrence_interval) : 1,
+        recurrence_end_date: formData.is_recurring && formData.recurrence_end_date ? formData.recurrence_end_date : null,
       };
 
       if (selectedEvent) {
@@ -76,7 +88,7 @@ export default function SchedulePage() {
         toast.success("Event updated");
       } else {
         await apiClient.post("/events", payload);
-        toast.success("Event created");
+        toast.success(formData.is_recurring ? "Recurring event created!" : "Event created");
       }
       setIsAddOpen(false);
       setSelectedEvent(null);
@@ -121,6 +133,10 @@ export default function SchedulePage() {
       event_type: event.event_type,
       start_datetime: startLocal,
       end_datetime: endLocal,
+      is_recurring: event.is_recurring || false,
+      recurrence_type: event.recurrence_type || "none",
+      recurrence_interval: event.recurrence_interval || 1,
+      recurrence_end_date: event.recurrence_end_date || "",
     });
     setSelectedEvent(event);
     setIsAddOpen(true);
@@ -146,6 +162,10 @@ export default function SchedulePage() {
       event_type: "meeting",
       start_datetime: startIso,
       end_datetime: endIso,
+      is_recurring: false,
+      recurrence_type: "none",
+      recurrence_interval: 1,
+      recurrence_end_date: "",
     });
     setSelectedEvent(null);
     setIsAddOpen(true);
@@ -339,6 +359,8 @@ export default function SchedulePage() {
                 <option value="task">Task</option>
                 <option value="class">Class</option>
                 <option value="reminder">Reminder</option>
+                <option value="deadline">Deadline</option>
+                <option value="study">Study Session</option>
               </select>
             </div>
             <div className="space-y-4">
@@ -370,6 +392,43 @@ export default function SchedulePage() {
                 placeholder="Discuss project roadmap..."
               />
             </div>
+            {/* Recurrence */}
+            <div className="space-y-2">
+              <Label>Repeat</Label>
+              <select
+                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+                value={formData.recurrence_type}
+                onChange={e => setFormData({...formData, recurrence_type: e.target.value, is_recurring: e.target.value !== 'none'})}
+              >
+                <option value="none">Never</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="yearly">Yearly</option>
+              </select>
+            </div>
+            {formData.is_recurring && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Every</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={formData.recurrence_interval}
+                    onChange={e => setFormData({...formData, recurrence_interval: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>End Date</Label>
+                  <Input
+                    type="date"
+                    value={formData.recurrence_end_date}
+                    onChange={e => setFormData({...formData, recurrence_end_date: e.target.value})}
+                  />
+                </div>
+              </div>
+            )}
             <div className="flex justify-end gap-2 pt-4">
               {selectedEvent && (
                 <Button type="button" variant="destructive" onClick={() => handleDeleteEvent(selectedEvent.id)} className="mr-auto">
